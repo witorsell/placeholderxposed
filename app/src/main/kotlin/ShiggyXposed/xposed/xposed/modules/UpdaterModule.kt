@@ -1,7 +1,6 @@
 package ShiggyXposed.xposed.modules
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.Context
 import android.util.AtomicFile
 import android.widget.Toast
@@ -11,7 +10,7 @@ import ShiggyXposed.xposed.Constants
 import ShiggyXposed.xposed.Module
 import ShiggyXposed.xposed.Utils
 import ShiggyXposed.xposed.Utils.Companion.JSON
-import ShiggyXposed.xposed.Utils.Companion.reloadApp
+
 import ShiggyXposed.xposed.Utils.Log
 import ShiggyXposed.xposed.modules.bridge.BridgeModule
 import io.ktor.client.*
@@ -54,6 +53,7 @@ object UpdaterModule : Module() {
     private const val CONFIG_FILE = "loader.json"
 
     private const val DEFAULT_BASE_URL = "https://github.com/kmmiio99o/ShiggyCord/releases/latest/download/"
+    private const val FALLBACK_BASE_URL = "https://bundle.shiggycord.dev/"
     private const val DEFAULT_BUNDLE_NAME = "shiggycord.min.js"
 
     override fun onLoad(packageParam: XC_LoadPackage.LoadPackageParam) = with(packageParam) {
@@ -119,17 +119,6 @@ object UpdaterModule : Module() {
 
                         response.headers[HttpHeaders.ETag]?.let { etag.writeText(it) } ?: etag.delete()
                         Log.i("Bundle updated: ${bytes.size} bytes")
-
-                        if (activity != null) {
-                            withContext(Dispatchers.Main) {
-                                AlertDialog.Builder(activity)
-                                    .setTitle("Update Successful")
-                                    .setMessage("Reload required.")
-                                    .setPositiveButton("Reload") { _, _ -> reloadApp() }
-                                    .setCancelable(false)
-                                    .show()
-                            }
-                        }
                     }
 
                     HttpStatusCode.NotModified -> Log.i("Bundle is up to date (304)")
@@ -138,9 +127,6 @@ object UpdaterModule : Module() {
             }
         } catch (e: Throwable) {
             Log.e("Updater Error", e)
-            if (activity != null) withContext(Dispatchers.Main) {
-                Toast.makeText(activity, "Update failed: ${e.message}", Toast.LENGTH_LONG).show()
-            }
         }
     }
 
@@ -149,23 +135,29 @@ object UpdaterModule : Module() {
             return config.customLoadUrl.url
         }
 
+        return tryResolveUrl(client, DEFAULT_BASE_URL)
+            ?: tryResolveUrl(client, FALLBACK_BASE_URL)
+            ?: DEFAULT_BASE_URL + DEFAULT_BUNDLE_NAME
+    }
+
+    private suspend fun tryResolveUrl(client: HttpClient, baseUrl: String): String? {
         return try {
-            val infoResponse = client.get("${DEFAULT_BASE_URL}info.json")
+            val infoResponse = client.get("${baseUrl}info.json")
             if (infoResponse.status == HttpStatusCode.OK) {
                 val info = JSON.decodeFromString<EndpointInfo>(infoResponse.bodyAsText())
                 val hermesVersion = withTimeoutOrNull(2000L) {
                     runCatching { LibUnbound.getHermesRuntimeBytecodeVersion() }.getOrNull()
                 } ?: 96
 
-                val hbcName = "kettu.$hermesVersion.hbc"
+                val hbcName = "shiggycord.$hermesVersion.hbc"
                 when {
-                    info.paths.contains(hbcName) -> DEFAULT_BASE_URL + hbcName
-                    info.paths.contains("kettu.min.js") -> DEFAULT_BASE_URL + "kettu.min.js"
-                    else -> DEFAULT_BASE_URL + DEFAULT_BUNDLE_NAME
+                    info.paths.contains(hbcName) -> baseUrl + hbcName
+                    info.paths.contains("shiggycord.min.js") -> baseUrl + "shiggycord.min.js"
+                    else -> baseUrl + DEFAULT_BUNDLE_NAME
                 }
-            } else DEFAULT_BASE_URL + DEFAULT_BUNDLE_NAME
+            } else null
         } catch (e: Exception) {
-            DEFAULT_BASE_URL + DEFAULT_BUNDLE_NAME
+            null
         }
     }
 

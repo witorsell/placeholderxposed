@@ -16,6 +16,15 @@ android {
         versionName = "1.3.2"
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("../release.keystore")
+            storePassword = "shiggyxposed"
+            keyAlias = "shiggyxposed"
+            keyPassword = "shiggyxposed"
+        }
+    }
+
     buildTypes {
         debug {
             isDebuggable = true
@@ -25,6 +34,7 @@ android {
         release {
             isDebuggable = false
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
