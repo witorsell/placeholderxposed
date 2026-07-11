@@ -178,8 +178,14 @@ object BubbleModule : Module() {
                 }
             }
             invalidateOutline()
-            translationY = 4.px.toFloat()
         }
+
+        // Nudge the avatar down into the bubble. The avatar decoration is a separate ImageView
+        // layered over the avatar in the same container, so move every sibling ImageView by the
+        // same amount, otherwise the decoration floats a few px above the rounded avatar.
+        val nudge = 4.px.toFloat()
+        val siblings = (imageView.parent as? ViewGroup)?.children?.filterIsInstance<ImageView>()
+        if (siblings != null) siblings.forEach { it.translationY = nudge } else imageView.translationY = nudge
     }
 
     private fun applyBubbleChat(viewGroup: ViewGroup) {
