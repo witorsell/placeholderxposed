@@ -14,7 +14,7 @@ import java.io.File
 
 object AdditionalBridgeMethodsModule : Module() {
     override fun onContext(context: Context) = with(context) {
-        BridgeModule.registerMethod("Shiggy.fs.getConstants") {
+        BridgeModule.registerMethod("fs.getConstants") {
             mapOf(
                 "data" to dataDir.absolutePath,
                 "files" to filesDir.absolutePath,
@@ -22,7 +22,7 @@ object AdditionalBridgeMethodsModule : Module() {
             )
         }
 
-        BridgeModule.registerMethod("Shiggy.fs.delete") {
+        BridgeModule.registerMethod("fs.delete") {
             val (path) = it
             File(path as String).run {
                 if (this.isDirectory) this.deleteRecursively()
@@ -30,33 +30,33 @@ object AdditionalBridgeMethodsModule : Module() {
             }
         }
 
-        BridgeModule.registerMethod("Shiggy.fs.exists") {
+        BridgeModule.registerMethod("fs.exists") {
             val (path) = it
             File(path as String).exists()
         }
 
-        BridgeModule.registerMethod("Shiggy.fs.read") { it ->
+        BridgeModule.registerMethod("fs.read") { it ->
             val (path) = it
             val file = File(path as String).apply { openFileGuarded() }
 
             file.bufferedReader().use { it.readText() }
         }
 
-        BridgeModule.registerMethod("Shiggy.fs.write") {
+        BridgeModule.registerMethod("fs.write") {
             val (path, contents) = it
             val file = File(path as String).apply { openFileGuarded() }
 
             file.writeText(contents as String)
         }
 
-        BridgeModule.registerMethod("Shiggy.app.reload") {
+        BridgeModule.registerMethod("app.reload") {
             reloadApp()
             null
         }
     }
 
     override fun onActivity(activity: Activity) = with(activity) {
-        BridgeModule.registerMethod("Shiggy.alertError") {
+        BridgeModule.registerMethod("alertError") {
             val (error, version) = it
             val app = getAppInfo()
             val errorString = "$error"
@@ -88,7 +88,7 @@ object AdditionalBridgeMethodsModule : Module() {
             null
         }
 
-        BridgeModule.registerMethod("Shiggy.showRecoveryAlert") {
+        BridgeModule.registerMethod("showRecoveryAlert") {
             Utils.showRecoveryAlert(this)
         }
     }

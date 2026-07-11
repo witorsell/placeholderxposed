@@ -33,7 +33,7 @@ class PluginsModule : Module() {
             dataDir, STATES_FILE
         ).apply { asFile() }
 
-        BridgeModule.registerMethod("Shiggy.plugins.states.read") {
+        BridgeModule.registerMethod("plugins.states.read") {
             if (::states.isInitialized) states.toMap() else
                 PluginStates.loadFromFileOrNull(statesFile)?.let {
                     states = it
@@ -41,7 +41,7 @@ class PluginsModule : Module() {
                 }
         }
 
-        BridgeModule.registerMethod("Shiggy.plugins.states.write") {
+        BridgeModule.registerMethod("plugins.states.write") {
             val (flags) = it
             @Suppress("UNCHECKED_CAST")
             states = PluginStates(

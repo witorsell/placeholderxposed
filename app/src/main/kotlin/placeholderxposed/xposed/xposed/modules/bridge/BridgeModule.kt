@@ -50,7 +50,7 @@ object BridgeModule : Module() {
     private lateinit var readableMapToHashMap: Method
     private lateinit var argumentsMakeNative: Method
 
-    private const val CALL_DATA_KEY = "Shiggy"
+    private const val CALL_DATA_KEY = "Placeholder"
     private const val METHOD_NAME_KEY = "method"
     private const val METHOD_ARGS_KEY = "args"
 
@@ -105,13 +105,17 @@ object BridgeModule : Module() {
     }
 
     private fun registerDefaultMethods() {
-        methods["Shiggy.info"] = {
+        methods["info"] = {
             mapOf(
                 "name" to Constants.LOADER_NAME, "version" to BuildConfig.VERSION_CODE
             )
         }
 
-        methods["Shiggy.test"] = {
+        methods["modules"] = {
+            methods.keys.toList()
+        }
+
+        methods["test"] = {
             mapOf(
                 "string" to "string",
                 "number" to 7256,
