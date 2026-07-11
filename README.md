@@ -7,7 +7,7 @@ This is a fork of [ShiggyXposed](https://github.com/kmmiio99o/ShiggyXposed) (kmm
 ### Added in this fork
 
 - **`BubbleModule` (native rounded chat bubbles).** Hooks Discord's native `com.discord.chat.presentation.message.MessageView` and paints a rounded `GradientDrawable` behind each message plus rounds the avatar. This is the piece the client's `bubblemodule.ts` shim never had a native half for. Ported from [rainXposed](https://github.com/ra1ncord/rainXposed). On by default; exposes `bubbles.hook` / `bubbles.unhook` / `bubbles.configure` bridge methods.
-- Release builds are signed with a stable committed keystore and published to Releases, so the Manager can pull them and update-over-install keeps the same signature.
+- Release builds are signed in CI from a keystore held in encrypted GitHub Actions secrets (never committed) and published to Releases, so the Manager can pull them and update-over-install keeps the same signature.
 
 You don't need root: [Placeholder Manager](https://github.com/witorsell/PlaceholderManager) embeds this module into Discord with LSPatch.
 
