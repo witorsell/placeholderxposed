@@ -56,7 +56,7 @@ object CacheModule : Module() {
             ShiggyCacheDir, "$ASSETS_CACHE_PREFIX.$versionCode"
         ).apply { asFile() }
 
-        BridgeModule.registerMethod("Shiggy.caches.modules.read") {
+        BridgeModule.registerMethod("caches.modules.read") {
             if (::modulesCache.isInitialized) modulesCache.toMap() else ModulesCache.loadFromFileOrNull(modulesCacheFile)
                 ?.let {
                     modulesCache = it
@@ -64,7 +64,7 @@ object CacheModule : Module() {
                 }
         }
 
-        BridgeModule.registerMethod("Shiggy.caches.modules.write") {
+        BridgeModule.registerMethod("caches.modules.write") {
             val (blacklist, finds) = it
             @Suppress("UNCHECKED_CAST")
             modulesCache = ModulesCache(
@@ -73,7 +73,7 @@ object CacheModule : Module() {
             Log.i("Modules cache saved: ${modulesCacheFile.absolutePath} (blacklisted: ${blacklist.size}, finds: ${finds.size})")
         }
 
-        BridgeModule.registerMethod("Shiggy.caches.assets.read") {
+        BridgeModule.registerMethod("caches.assets.read") {
             if (::assetsCache.isInitialized) assetsCache.toMap() else AssetsCache.loadFromFileOrNull(assetsCacheFile)
                 ?.let {
                     assetsCache = it
@@ -81,7 +81,7 @@ object CacheModule : Module() {
                 }
         }
 
-        BridgeModule.registerMethod("Shiggy.caches.assets.write") {
+        BridgeModule.registerMethod("caches.assets.write") {
             val (data) = it
             @Suppress("UNCHECKED_CAST")
             assetsCache =
