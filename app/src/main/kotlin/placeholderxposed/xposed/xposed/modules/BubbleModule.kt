@@ -1,7 +1,5 @@
 package placeholderxposed.xposed.modules
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Color
 import android.graphics.Outline
@@ -16,7 +14,6 @@ import android.view.ViewGroup.MarginLayoutParams
 import android.view.ViewOutlineProvider
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.Toast
 import androidx.core.view.children
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
@@ -165,41 +162,10 @@ object BubbleModule : Module() {
         return null
     }
 
-    // Copy a one-shot diagnostic to the clipboard (and toast it) the first time we round an
-    // avatar, so the exact view + radius reaching getOutline can be inspected without adb.
-    private var copiedDiag = false
-
-    private fun copyDiag(text: String, ctx: Context) {
-        try {
-            val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-            cm?.setPrimaryClip(ClipData.newPlainText("BubbleModule", text))
-            Toast.makeText(ctx, "BubbleModule diag copied to clipboard", Toast.LENGTH_LONG).show()
-        } catch (e: Throwable) {
-            XposedBridge.log("[BubbleModule] copyDiag failed: ${e.message}")
-        }
-    }
-
     private fun applyRoundedSquareProfilePicture(viewGroup: ViewGroup) {
-        val direct = viewGroup.children.filterIsInstance<ImageView>().firstOrNull()
-        val imageView = direct ?: findFirstImageView(viewGroup)
-
-        if (!copiedDiag) {
-            copiedDiag = true
-            val f = configFile
-            val cfgText = try { if (f?.exists() == true) f.readText() else "MISSING at ${f?.absolutePath}" } catch (e: Throwable) { "read error: ${e.message}" }
-            val diag = buildString {
-                append("avatarView=").append(imageView?.javaClass?.name ?: "NONE").append('\n')
-                append("size=").append(imageView?.width).append('x').append(imageView?.height).append('\n')
-                append("direct=").append(direct != null).append('\n')
-                append("avatarCurveRadius(pct)=").append(avatarCurveRadius).append('\n')
-                append("bubbleCurveRadius=").append(bubbleCurveRadius).append('\n')
-                append("chatBubbleColor=").append(Integer.toHexString(chatBubbleColor)).append('\n')
-                append("configFile=").append(cfgText)
-            }
-            copyDiag(diag, viewGroup.context)
-        }
-
-        if (imageView == null) return
+        val imageView = viewGroup.children.filterIsInstance<ImageView>().firstOrNull()
+            ?: findFirstImageView(viewGroup)
+            ?: return
         imageView.apply {
             clipToOutline = true
             outlineProvider = object : ViewOutlineProvider() {
