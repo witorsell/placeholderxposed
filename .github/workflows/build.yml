@@ -23,7 +23,17 @@ jobs:
       - name: Make Gradle executable
         run: chmod +x ./gradlew
 
+      - name: Decode release keystore
+        env:
+          SIGNING_KEYSTORE: ${{ secrets.SIGNING_KEYSTORE }}
+        run: echo "$SIGNING_KEYSTORE" | base64 -d > "$GITHUB_WORKSPACE/release.keystore"
+
       - name: Build APKs
+        env:
+          SIGNING_STORE_FILE: ${{ github.workspace }}/release.keystore
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: |
           # Retry the Gradle build up to 3 times to mitigate transient cache/service errors
           ATTEMPT=0
