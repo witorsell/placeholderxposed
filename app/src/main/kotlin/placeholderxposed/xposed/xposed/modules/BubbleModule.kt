@@ -46,7 +46,8 @@ object BubbleModule : Module() {
     // Guards one-time installation of the method hooks.
     private var hooked = false
 
-    private val DEFAULT_AVATAR_CURVE_RADIUS = 12.px.toFloat()
+    // Avatar corner radius as a percentage of the avatar size (0 = square, 50 = full circle).
+    private val DEFAULT_AVATAR_CURVE_RADIUS = 30f
     private val DEFAULT_BUBBLE_CURVE_RADIUS = 12.px.toFloat()
     private val DEFAULT_BUBBLE_COLOR = 0x66000000.toInt()
     private val PADDING_SMALL = 6.px
@@ -169,7 +170,11 @@ object BubbleModule : Module() {
             clipToOutline = true
             outlineProvider = object : ViewOutlineProvider() {
                 override fun getOutline(view: View?, outline: Outline?) {
-                    outline?.setRoundRect(0, 0, view!!.width, view.height, avatarCurveRadius)
+                    val v = view ?: return
+                    // avatarCurveRadius is a percentage (0 = square, 50 = full circle) so the
+                    // corner looks the same regardless of the avatar's pixel size / screen density.
+                    val r = (avatarCurveRadius.coerceIn(0f, 50f) / 100f) * minOf(v.width, v.height)
+                    outline?.setRoundRect(0, 0, v.width, v.height, r)
                 }
             }
             translationY = 4.px.toFloat()
