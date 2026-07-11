@@ -73,12 +73,12 @@ object BubbleModule : Module() {
 
         BridgeModule.registerMethod("bubbles.hook") {
             hookBubbles()
-            null
+            currentBubbleState()
         }
 
         BridgeModule.registerMethod("bubbles.unhook") {
             unhookBubbles()
-            null
+            currentBubbleState()
         }
 
         BridgeModule.registerMethod("bubbles.configure") {
@@ -86,7 +86,7 @@ object BubbleModule : Module() {
             val bubbleRadius = it.getOrNull(1) as? Number
             val bubbleColor = it.getOrNull(2) as? Number
             configure(avatarRadius?.toFloat(), bubbleRadius?.toFloat(), bubbleColor?.toInt())
-            null
+            currentBubbleState()
         }
     }
 
@@ -290,6 +290,15 @@ object BubbleModule : Module() {
         bubbleRadius?.let { bubbleCurveRadius = it }
         bubbleColor?.let { chatBubbleColor = it }
     }
+
+    // What the bubble bridge methods hand back to JS, so a caller sees the applied state
+    // instead of null. Floats are widened to Double for React Native serialization.
+    private fun currentBubbleState(): Map<String, Any?> = mapOf(
+        "enabled" to hooksEnabled,
+        "avatarRadius" to avatarCurveRadius.toDouble(),
+        "bubbleRadius" to bubbleCurveRadius.toDouble(),
+        "bubbleColor" to chatBubbleColor,
+    )
 
     // Cheaply re-read bubbles.json when it changes (throttled), so ChatBubbles settings
     // apply after a JS reload without needing a full app restart.
