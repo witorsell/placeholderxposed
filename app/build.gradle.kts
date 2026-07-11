@@ -16,12 +16,16 @@ android {
         versionName = "1.3.3"
     }
 
+    val signingStoreFile = System.getenv("SIGNING_STORE_FILE")
+
     signingConfigs {
         create("release") {
-            storeFile = file("../release.keystore")
-            storePassword = "placeholderxposed"
-            keyAlias = "placeholderxposed"
-            keyPassword = "placeholderxposed"
+            if (signingStoreFile != null) {
+                storeFile = file(signingStoreFile)
+                storePassword = System.getenv("SIGNING_STORE_PASSWORD")
+                keyAlias = System.getenv("SIGNING_KEY_ALIAS")
+                keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+            }
         }
     }
 
@@ -34,7 +38,12 @@ android {
         release {
             isDebuggable = false
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("release")
+            // Signed with the release key from CI secrets when present, otherwise falls
+            // back to the debug key so local builds and PRs still produce an installable APK.
+            signingConfig = if (signingStoreFile != null)
+                signingConfigs.getByName("release")
+            else
+                signingConfigs.getByName("debug")
         }
     }
     compileOptions {
