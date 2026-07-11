@@ -57,11 +57,16 @@ object BubbleModule : Module() {
     private var bubbleCurveRadius = DEFAULT_BUBBLE_CURVE_RADIUS
     private var chatBubbleColor = DEFAULT_BUBBLE_COLOR
 
+    private var configFile: File? = null
+    private var lastConfigMtime = -1L
+    private var lastConfigCheck = 0L
+
     override fun onContext(context: Context) {
-        // The ChatBubbles core plugin writes files/pyoncord/bubbles.json; read it so the
-        // plugin's toggle and appearance settings apply on reload. Bridge methods below
-        // still allow live control if a future JS bridge calls them.
-        loadConfig(context)
+        // The ChatBubbles core plugin writes files/pyoncord/bubbles.json. Track the file and
+        // re-read it live (see maybeReloadConfig) so settings apply on a JS reload, without a
+        // full app restart which the native process would otherwise need.
+        configFile = File(context.filesDir, "pyoncord/bubbles.json")
+        reloadConfigFromDisk()
 
         BridgeModule.registerMethod("bubbles.hook") {
             hookBubbles()
@@ -117,6 +122,7 @@ object BubbleModule : Module() {
             if (configureAuthorMethod != null) {
                 configureAuthorHook = XposedBridge.hookMethod(configureAuthorMethod, object : XC_MethodHook() {
                     override fun afterHookedMethod(param: XC_MethodHook.MethodHookParam) {
+                        maybeReloadConfig()
                         if (!hooksEnabled) return
                         val view = param.thisObject as ViewGroup
                         applyRoundedSquareProfilePicture(view)
@@ -144,8 +150,21 @@ object BubbleModule : Module() {
         view.setPadding(view.paddingLeft, topMargin + view.paddingTop, view.paddingRight, view.paddingBottom)
     }
 
+    // Depth-first search for the first ImageView. rain assumed the avatar was a direct child
+    // ImageView of the message view, but on newer Discord builds it's nested deeper, so a
+    // direct-children scan finds nothing and the avatar never gets rounded.
+    private fun findFirstImageView(root: ViewGroup): ImageView? {
+        for (child in root.children) {
+            if (child is ImageView) return child
+            if (child is ViewGroup) findFirstImageView(child)?.let { return it }
+        }
+        return null
+    }
+
     private fun applyRoundedSquareProfilePicture(viewGroup: ViewGroup) {
-        val imageView = viewGroup.children.filterIsInstance<ImageView>().firstOrNull() ?: return
+        val imageView = viewGroup.children.filterIsInstance<ImageView>().firstOrNull()
+            ?: findFirstImageView(viewGroup)
+            ?: return
         imageView.apply {
             clipToOutline = true
             outlineProvider = object : ViewOutlineProvider() {
@@ -248,23 +267,39 @@ object BubbleModule : Module() {
         bubbleColor?.let { chatBubbleColor = it }
     }
 
+    // Cheaply re-read bubbles.json when it changes (throttled), so ChatBubbles settings
+    // apply after a JS reload without needing a full app restart.
+    private fun maybeReloadConfig() {
+        val now = System.currentTimeMillis()
+        if (now - lastConfigCheck < 500L) return
+        lastConfigCheck = now
+        val f = configFile ?: return
+        val mtime = if (f.exists()) f.lastModified() else -1L
+        if (mtime != lastConfigMtime) {
+            lastConfigMtime = mtime
+            reloadConfigFromDisk()
+        }
+    }
+
     // Reads files/pyoncord/bubbles.json written by the ChatBubbles core plugin.
     // Shape: { "enabled": Boolean, "avatarRadius": Number, "bubbleRadius": Number, "bubbleColor": "#rrggbb" }
-    private fun loadConfig(context: Context) {
+    // Radii are treated as dp and scaled to px so they're visible at the same scale as the defaults.
+    private fun reloadConfigFromDisk() {
+        val f = configFile ?: return
         try {
-            val file = File(context.filesDir, "pyoncord/bubbles.json")
-            if (!file.exists()) return
-            val json = JSONObject(file.readText())
+            if (!f.exists()) return
+            val json = JSONObject(f.readText())
             hooksEnabled = json.optBoolean("enabled", hooksEnabled)
             if (json.has("avatarRadius")) avatarCurveRadius = json.getDouble("avatarRadius").toFloat()
             if (json.has("bubbleRadius")) bubbleCurveRadius = json.getDouble("bubbleRadius").toFloat()
             val color = json.optString("bubbleColor", "")
-            if (color.isNotEmpty()) {
-                runCatching { chatBubbleColor = Color.parseColor(color) }
-            }
-            XposedBridge.log("[BubbleModule] config loaded: enabled=$hooksEnabled")
+            chatBubbleColor = if (color.isNotEmpty())
+                runCatching { Color.parseColor(color) }.getOrDefault(DEFAULT_BUBBLE_COLOR)
+            else
+                DEFAULT_BUBBLE_COLOR
+            XposedBridge.log("[BubbleModule] config: enabled=$hooksEnabled avatar=$avatarCurveRadius bubble=$bubbleCurveRadius")
         } catch (e: Throwable) {
-            XposedBridge.log("[BubbleModule] loadConfig failed: ${e.message}")
+            XposedBridge.log("[BubbleModule] config reload failed: ${e.message}")
         }
     }
 
