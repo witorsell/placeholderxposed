@@ -48,6 +48,8 @@ object BubbleModule : Module() {
 
     // Avatar corner radius as a percentage of the avatar size (0 = square, 50 = full circle).
     private val DEFAULT_AVATAR_CURVE_RADIUS = 30f
+    // How far the avatar (and its decoration) drop to sit lower inside the bubble.
+    private val AVATAR_NUDGE = 4.px.toFloat()
     private val DEFAULT_BUBBLE_CURVE_RADIUS = 12.px.toFloat()
     private val DEFAULT_BUBBLE_COLOR = 0x66000000.toInt()
     private val PADDING_SMALL = 6.px
@@ -162,6 +164,18 @@ object BubbleModule : Module() {
         return null
     }
 
+    // Resolved once from Discord's resources: the id of author_avatar_decoration, the separate
+    // SimpleDraweeView that Discord anchors to the avatar's layout box (see decompiled
+    // message_view.xml). Translating the avatar alone leaves it behind, so we move it too.
+    private var avatarDecorationId = 0
+
+    private fun findAvatarDecoration(root: View): View? {
+        if (avatarDecorationId == 0) {
+            avatarDecorationId = root.resources.getIdentifier("author_avatar_decoration", "id", root.context.packageName)
+        }
+        return if (avatarDecorationId != 0) root.findViewById(avatarDecorationId) else null
+    }
+
     private fun applyRoundedSquareProfilePicture(viewGroup: ViewGroup) {
         val imageView = viewGroup.children.filterIsInstance<ImageView>().firstOrNull()
             ?: findFirstImageView(viewGroup)
@@ -178,11 +192,12 @@ object BubbleModule : Module() {
                 }
             }
             invalidateOutline()
-            // Leave the avatar where Discord positions it. rain nudged it down 4px to sit lower
-            // in the bubble, but the avatar decoration is a separate view that doesn't move, so
-            // the nudge made the decoration float above the rounded avatar. Keep them aligned.
-            translationY = 0f
+            // Nudge the avatar down so it sits lower in the bubble.
+            translationY = AVATAR_NUDGE
         }
+        // The decoration is anchored to the avatar's layout box, not its translation, so push it
+        // down by the same amount. Both move equally, so they stay concentric and aligned.
+        findAvatarDecoration(viewGroup)?.translationY = AVATAR_NUDGE
     }
 
     private fun applyBubbleChat(viewGroup: ViewGroup) {
