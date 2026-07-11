@@ -53,7 +53,6 @@ object UpdaterModule : Module() {
     private const val CONFIG_FILE = "loader.json"
 
     private const val DEFAULT_BASE_URL = "https://github.com/witorsell/placeholdercord/releases/latest/download/"
-    private const val FALLBACK_BASE_URL = "https://bundle.placeholdercord.dev/"
     private const val DEFAULT_BUNDLE_NAME = "placeholdercord.min.js"
 
     override fun onLoad(packageParam: XC_LoadPackage.LoadPackageParam) = with(packageParam) {
@@ -136,7 +135,6 @@ object UpdaterModule : Module() {
         }
 
         return tryResolveUrl(client, DEFAULT_BASE_URL)
-            ?: tryResolveUrl(client, FALLBACK_BASE_URL)
             ?: DEFAULT_BASE_URL + DEFAULT_BUNDLE_NAME
     }
 
