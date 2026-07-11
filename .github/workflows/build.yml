@@ -6,7 +6,9 @@ jobs:
   build:
     name: Build and push
     runs-on: ubuntu-latest
-    
+    permissions:
+      contents: write
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -45,14 +47,8 @@ jobs:
       - name: Move debug APK
         run: mv ./app/build/outputs/apk/debug/app-debug.apk /tmp/placeholderxposedbuild/apks
 
-      - name: Download uber-apk-signer
-        run: wget -nv "https://github.com/patrickfav/uber-apk-signer/releases/download/v1.2.1/uber-apk-signer-1.2.1.jar" -O /tmp/placeholderxposedbuild/tools/uber-apk-signer.jar
-
-      - name: Sign release APK
-        run: java -jar /tmp/placeholderxposedbuild/tools/uber-apk-signer.jar --apks ./app/build/outputs/apk/release/app-release-unsigned.apk --out /tmp/placeholderxposedbuild/apks/
-
-      - name: Rename release APK
-        run: mv /tmp/placeholderxposedbuild/apks/app-release-aligned-debugSigned.apk /tmp/placeholderxposedbuild/apks/app-release.apk
+      - name: Move release APK
+        run: mv ./app/build/outputs/apk/release/app-release.apk /tmp/placeholderxposedbuild/apks/app-release.apk
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
@@ -65,3 +61,12 @@ jobs:
         with:
           name: app-release
           path: /tmp/placeholderxposedbuild/apks/app-release.apk
+
+      - name: Publish release
+        if: github.ref == 'refs/heads/master'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: placeholderxposed build ${{ github.run_number }}
+          files: /tmp/placeholderxposedbuild/apks/app-release.apk
+          make_latest: true
