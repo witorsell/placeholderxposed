@@ -162,10 +162,34 @@ object BubbleModule : Module() {
         return null
     }
 
+    // Set to true once, dumps the message-view tree to logcat so we can see what the avatar
+    // view actually is on this Discord build instead of guessing.
+    private var dumpedTree = false
+
+    private fun dumpTree(root: View, depth: Int) {
+        val pad = "  ".repeat(depth)
+        val cls = root.javaClass.name
+        XposedBridge.log("[BubbleModule] $pad$cls ${root.width}x${root.height}" +
+            if (root is ImageView) " <-- ImageView" else "")
+        if (root is ViewGroup) for (c in root.children) dumpTree(c, depth + 1)
+    }
+
     private fun applyRoundedSquareProfilePicture(viewGroup: ViewGroup) {
-        val imageView = viewGroup.children.filterIsInstance<ImageView>().firstOrNull()
-            ?: findFirstImageView(viewGroup)
-            ?: return
+        if (!dumpedTree) {
+            dumpedTree = true
+            XposedBridge.log("[BubbleModule] ==== MessageView tree dump ====")
+            dumpTree(viewGroup, 0)
+            XposedBridge.log("[BubbleModule] ==== end dump ====")
+        }
+
+        val direct = viewGroup.children.filterIsInstance<ImageView>().firstOrNull()
+        val imageView = direct ?: findFirstImageView(viewGroup)
+        if (imageView == null) {
+            XposedBridge.log("[BubbleModule] avatar: NO ImageView found in message view")
+            return
+        }
+        XposedBridge.log("[BubbleModule] avatar: ${imageView.javaClass.name} ${imageView.width}x${imageView.height} " +
+            "direct=${direct != null} radius%=$avatarCurveRadius")
         imageView.apply {
             clipToOutline = true
             outlineProvider = object : ViewOutlineProvider() {
@@ -177,6 +201,7 @@ object BubbleModule : Module() {
                     outline?.setRoundRect(0, 0, v.width, v.height, r)
                 }
             }
+            invalidateOutline()
             translationY = 4.px.toFloat()
         }
     }
