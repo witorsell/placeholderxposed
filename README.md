@@ -138,14 +138,14 @@ Notes:
    - Confirm you have the compatible LSPosed fork installed (JingMatrix recommended).
 
 2. Recovery menu shows visual glitches when changing themes?
-   - The menu attempts to apply colors in-place. If you see transient visual artifacts, try closing and reopening the menu — the settings are persisted and will apply on reopen.
+   - The menu attempts to apply colors in-place. If you see transient visual artifacts, try closing and reopening the menu - the settings are persisted and will apply on reopen.
    - If an area does not update, please report which dialog/control (and the device/Android version) so it can be targeted.
 
 3. Bundle injection not toggling?
    - Toggling injection manipulates files under the app's cache directory. If that fails, check file permissions or whether the cache path changed on your build of Discord.
    - You can also manually inspect `data/data/<discord.package>/cache/...` to see `.disabled` marker files (depending on your device and build).
 
-4. I accidentally broke Discord — how do I recover?
+4. I accidentally broke Discord - how do I recover?
    - Use the Recovery → Options → Clear Cache & Reset option to remove cached bundles and restore default loader settings, then reload Discord.
    - If Discord fails to start, reboot the device to make sure changes are applied cleanly.
 
@@ -168,7 +168,7 @@ Contributions are welcome. If you want to help:
 Guidelines:
 - Keep commits small and descriptive.
 - Include code comments for complex logic (hooks, file-system operations).
-- Respect user privacy — do not add telemetry or data exfiltration.
+- Respect user privacy - do not add telemetry or data exfiltration.
 
 ---
 
@@ -176,16 +176,16 @@ Guidelines:
 
 This project stands on the shoulders of many open-source projects and contributors:
 
-- [LSPosed Team](https://github.com/LSPosed) — the Xposed framework implementation used to run modules.
-- [JingMatrix](https://github.com/JingMatrix) — author of the LSPosed fork referenced by many users.
-- [cocobo1](https://codeberg.org/cocobo1) — for adapting some features to Xposed which [Revenge Team](https://github.com/revenge-mod) didn't.
-- [Revenge Team](https://github.com/revenge-mod) — provided earlier Xposed module work that informed parts of this project.
+- [LSPosed Team](https://github.com/LSPosed) - the Xposed framework implementation used to run modules.
+- [JingMatrix](https://github.com/JingMatrix) - author of the LSPosed fork referenced by many users.
+- [cocobo1](https://codeberg.org/cocobo1) - for adapting some features to Xposed which [Revenge Team](https://github.com/revenge-mod) didn't.
+- [Revenge Team](https://github.com/revenge-mod) - provided earlier Xposed module work that informed parts of this project.
 
 ---
 
 ## License
 
-Please refer to the `LICENSE` file in the repository root for the project license (if present). If no license file exists, the repository's default (copyright) status applies — check the repo settings or ask the maintainer for clarification.
+Please refer to the `LICENSE` file in the repository root for the project license (if present). If no license file exists, the repository's default (copyright) status applies - check the repo settings or ask the maintainer for clarification.
 
 ---
 

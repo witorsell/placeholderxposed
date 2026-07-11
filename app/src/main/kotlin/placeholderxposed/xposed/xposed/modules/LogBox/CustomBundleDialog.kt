@@ -62,7 +62,7 @@ object CustomBundleDialog {
         container.addView(toggleContainer)
 
         val urlInput = EditText(context).apply {
-            hint = "http://localhost:4040/shiggycord.js"
+            hint = "http://localhost:4040/placeholdercord.js"
             setTextColor(colors.onSurface)
             setHintTextColor(colors.onSurfaceVariant)
             background = LogBoxUtils.createM3Background(context, colors.surfaceVariant, 12f)
@@ -146,7 +146,7 @@ object CustomBundleDialog {
                 } else if (!enabled) {
                     LogBoxActions.setCustomBundleURL(
                         context,
-                        url.ifEmpty { "http://localhost:4040/shiggycord.js" },
+                        url.ifEmpty { "http://localhost:4040/placeholdercord.js" },
                         false
                     )
                     dialog.dismiss()
