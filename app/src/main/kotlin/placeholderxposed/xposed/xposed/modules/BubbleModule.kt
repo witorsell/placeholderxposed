@@ -1,10 +1,13 @@
 package placeholderxposed.xposed.modules
 
 import android.content.Context
+import android.graphics.Color
 import android.graphics.Outline
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.InsetDrawable
 import android.os.Build
+import java.io.File
+import org.json.JSONObject
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewGroup.MarginLayoutParams
@@ -55,6 +58,11 @@ object BubbleModule : Module() {
     private var chatBubbleColor = DEFAULT_BUBBLE_COLOR
 
     override fun onContext(context: Context) {
+        // The ChatBubbles core plugin writes files/pyoncord/bubbles.json; read it so the
+        // plugin's toggle and appearance settings apply on reload. Bridge methods below
+        // still allow live control if a future JS bridge calls them.
+        loadConfig(context)
+
         BridgeModule.registerMethod("bubbles.hook") {
             hookBubbles()
             null
@@ -238,6 +246,26 @@ object BubbleModule : Module() {
         avatarRadius?.let { avatarCurveRadius = it }
         bubbleRadius?.let { bubbleCurveRadius = it }
         bubbleColor?.let { chatBubbleColor = it }
+    }
+
+    // Reads files/pyoncord/bubbles.json written by the ChatBubbles core plugin.
+    // Shape: { "enabled": Boolean, "avatarRadius": Number, "bubbleRadius": Number, "bubbleColor": "#rrggbb" }
+    private fun loadConfig(context: Context) {
+        try {
+            val file = File(context.filesDir, "pyoncord/bubbles.json")
+            if (!file.exists()) return
+            val json = JSONObject(file.readText())
+            hooksEnabled = json.optBoolean("enabled", hooksEnabled)
+            if (json.has("avatarRadius")) avatarCurveRadius = json.getDouble("avatarRadius").toFloat()
+            if (json.has("bubbleRadius")) bubbleCurveRadius = json.getDouble("bubbleRadius").toFloat()
+            val color = json.optString("bubbleColor", "")
+            if (color.isNotEmpty()) {
+                runCatching { chatBubbleColor = Color.parseColor(color) }
+            }
+            XposedBridge.log("[BubbleModule] config loaded: enabled=$hooksEnabled")
+        } catch (e: Throwable) {
+            XposedBridge.log("[BubbleModule] loadConfig failed: ${e.message}")
+        }
     }
 
     private fun isChatBubblesSupported() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
