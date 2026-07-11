@@ -16,15 +16,6 @@ android {
         versionName = "1.3.3"
     }
 
-    signingConfigs {
-        create("release") {
-            storeFile = file("../release.keystore")
-            storePassword = "shiggyxposed"
-            keyAlias = "shiggyxposed"
-            keyPassword = "shiggyxposed"
-        }
-    }
-
     buildTypes {
         debug {
             isDebuggable = true
@@ -34,7 +25,9 @@ android {
         release {
             isDebuggable = false
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("release")
+            // No signingConfig: the release variant builds unsigned (app-release-unsigned.apk)
+            // and CI signs it with uber-apk-signer. The upstream release.keystore is gitignored
+            // and never exists on a fork, which broke validateSigningRelease.
         }
     }
     compileOptions {
