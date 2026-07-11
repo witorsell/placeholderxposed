@@ -14,6 +14,7 @@ import placeholderxposed.xposed.modules.appearance.SysColorsModule
 import placeholderxposed.xposed.modules.appearance.ThemesModule
 import placeholderxposed.xposed.modules.bridge.AdditionalBridgeMethodsModule
 import placeholderxposed.xposed.modules.bridge.BridgeModule
+import placeholderxposed.xposed.modules.bridge.VirtualCameraModule
 import placeholderxposed.xposed.modules.no_track.BlockCrashReportingModule
 import placeholderxposed.xposed.modules.no_track.BlockDeepLinksTrackingModule
 import placeholderxposed.xposed.modules.LogBox.*
@@ -51,7 +52,8 @@ class Main : Module(), IXposedHookLoadPackage, IXposedHookZygoteInit {
         FontsModule,
         ThemesModule,
         SysColorsModule,
-        BubbleModule
+        BubbleModule,
+        VirtualCameraModule
     )
 
     init {
