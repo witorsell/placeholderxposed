@@ -11,7 +11,7 @@ This is a fork of [ShiggyXposed](https://github.com/kmmiio99o/ShiggyXposed) (kmm
 
 You don't need root: [Placeholder Manager](https://github.com/witorsell/PlaceholderManager) embeds this module into Discord with LSPatch.
 
-This README explains prerequisites, installation, usage, troubleshooting, and credits. If you want help, open an issue on the repository or join the project's support server (links below).
+This README explains prerequisites, installation, usage, troubleshooting, and credits. If you want help, open an issue on the repository.
 
 ---
 
@@ -149,7 +149,7 @@ Notes:
    - Use the Recovery → Options → Clear Cache & Reset option to remove cached bundles and restore default loader settings, then reload Discord.
    - If Discord fails to start, reboot the device to make sure changes are applied cleanly.
 
-If you still have issues, open an issue on GitHub or join the support server (link below). Please include:
+If you still have issues, open an issue on GitHub. Please include:
 - Device model and Android version
 - Discord app version
 - A clear description of the problem and steps to reproduce
@@ -193,7 +193,6 @@ Please refer to the `LICENSE` file in the repository root for the project licens
 
 - Releases: https://github.com/witorsell/placeholderxposed/releases
 - Repository: https://github.com/witorsell/placeholderxposed
-- Support server: https://discord.gg/nQykFF9Ud6
 
 ---
 
