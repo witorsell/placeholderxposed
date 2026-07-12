@@ -14,6 +14,7 @@ import placeholderxposed.xposed.modules.appearance.SysColorsModule
 import placeholderxposed.xposed.modules.appearance.ThemesModule
 import placeholderxposed.xposed.modules.bridge.AdditionalBridgeMethodsModule
 import placeholderxposed.xposed.modules.bridge.BridgeModule
+import placeholderxposed.xposed.modules.bridge.DeviceSpoofModule
 import placeholderxposed.xposed.modules.bridge.VirtualCameraModule
 import placeholderxposed.xposed.modules.no_track.BlockCrashReportingModule
 import placeholderxposed.xposed.modules.no_track.BlockDeepLinksTrackingModule
@@ -54,7 +55,8 @@ class Main : Module(), IXposedHookLoadPackage, IXposedHookZygoteInit {
         SysColorsModule,
         BubbleModule,
         VirtualCameraModule,
-        placeholderxposed.xposed.modules.bridge.MediaPickerModule
+        placeholderxposed.xposed.modules.bridge.MediaPickerModule,
+        DeviceSpoofModule
     )
 
     init {
