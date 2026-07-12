@@ -53,7 +53,8 @@ class Main : Module(), IXposedHookLoadPackage, IXposedHookZygoteInit {
         ThemesModule,
         SysColorsModule,
         BubbleModule,
-        VirtualCameraModule
+        VirtualCameraModule,
+        placeholderxposed.xposed.modules.bridge.MediaPickerModule
     )
 
     init {
