@@ -73,12 +73,12 @@ object BubbleModule : Module() {
 
         BridgeModule.registerMethod("bubbles.hook") {
             hookBubbles()
-            currentBubbleState()
+            hooksEnabled
         }
 
         BridgeModule.registerMethod("bubbles.unhook") {
             unhookBubbles()
-            currentBubbleState()
+            hooksEnabled
         }
 
         BridgeModule.registerMethod("bubbles.configure") {

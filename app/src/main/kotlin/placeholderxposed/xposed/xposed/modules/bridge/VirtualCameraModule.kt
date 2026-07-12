@@ -37,10 +37,11 @@ object VirtualCameraModule : Module() {
                 isEnabled = true
                 Log.i("VirtualCamera: Feed set to $path")
             } else {
+                feedPath = null
                 isEnabled = false
                 Log.i("VirtualCamera: Disabled")
             }
-            null
+            path
         }
 
         videoFrameClass = classLoader.loadClass("org.webrtc.VideoFrame")
