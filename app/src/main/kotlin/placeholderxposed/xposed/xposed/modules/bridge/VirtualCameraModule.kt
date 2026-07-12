@@ -104,7 +104,7 @@ object VirtualCameraModule : Module() {
 
     private suspend fun pumpFrames(targetWidth: Int, targetHeight: Int, fps: Int) {
         if (targetWidth <= 0 || targetHeight <= 0) {
-            Log.e("VirtualCamera: Invalid dimensions $targetWidth x $targetHeight", null)
+            Log.e("VirtualCamera: Invalid dimensions $targetWidth x $targetHeight")
             return
         }
         val path = feedPath ?: return

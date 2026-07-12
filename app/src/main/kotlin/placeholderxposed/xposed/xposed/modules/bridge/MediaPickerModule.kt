@@ -48,7 +48,7 @@ object MediaPickerModule : Module() {
                         intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes)
                         activity.startActivityForResult(intent, 9999)
                     } else {
-                        Log.e("MediaPicker start failed: Activity is null", null)
+                        Log.e("MediaPicker start failed: Activity is null")
                         isPicking = false
                         pickResult = "CANCELLED"
                     }
