@@ -32,16 +32,16 @@ import placeholderxposed.xposed.px
  * Ported from rainXposed. Drawing happens natively because the chat surface is rendered
  * by native Kotlin, not React, so there is no JS message tree to wrap.
  *
- * Bubbles default to enabled. The bridge methods below let the JS layer toggle and
- * restyle them at runtime.
+ * Bubbles default to disabled; the Bubble Chat plugin turns them on over the Native
+ * Bridge. The bridge methods below let the JS layer toggle and restyle them at runtime.
  */
 object BubbleModule : Module() {
     private var configureAccessoriesMarginHook: XC_MethodHook.Unhook? = null
     private var configureAuthorHook: XC_MethodHook.Unhook? = null
 
-    // Whether the after-hooks actually draw. On by default so a fresh install shows
-    // bubbles without needing the JS side wired up first.
-    private var hooksEnabled = true
+    // Off by default: bubbles are an opt-in plugin now, not a built-in feature, so a
+    // fresh install shouldn't restyle chat until the user actually asks for it.
+    private var hooksEnabled = false
 
     // Guards one-time installation of the method hooks.
     private var hooked = false
