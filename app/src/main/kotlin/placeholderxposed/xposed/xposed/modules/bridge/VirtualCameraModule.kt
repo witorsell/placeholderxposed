@@ -22,6 +22,12 @@ object VirtualCameraModule : Module() {
     private var javaI420BufferClass: Class<*>? = null
     private var videoFrameBufferClass: Class<*>? = null
 
+    private var currentContext: Context? = null
+
+    override fun onContext(context: Context) {
+        currentContext = context
+    }
+
     override fun onLoad(packageParam: XC_LoadPackage.LoadPackageParam) {
         with(packageParam) {
             BridgeModule.registerMethod("camera.setMedia") { args ->
@@ -109,7 +115,13 @@ object VirtualCameraModule : Module() {
         }
         val path = feedPath ?: return
         try {
-            val bitmap = BitmapFactory.decodeFile(path) ?: return
+            val bitmap = if (path.startsWith("content://")) {
+                currentContext?.contentResolver?.openInputStream(android.net.Uri.parse(path))?.use {
+                    BitmapFactory.decodeStream(it)
+                }
+            } else {
+                BitmapFactory.decodeFile(path)
+            } ?: return
             
             val matrix = android.graphics.Matrix()
             matrix.preScale(-1.0f, 1.0f)
