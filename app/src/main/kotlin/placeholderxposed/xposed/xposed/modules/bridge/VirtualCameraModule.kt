@@ -103,10 +103,19 @@ object VirtualCameraModule : Module() {
     }
 
     private suspend fun pumpFrames(targetWidth: Int, targetHeight: Int, fps: Int) {
+        if (targetWidth <= 0 || targetHeight <= 0) {
+            Log.e("VirtualCamera: Invalid dimensions $targetWidth x $targetHeight", null)
+            return
+        }
         val path = feedPath ?: return
         try {
             val bitmap = BitmapFactory.decodeFile(path) ?: return
-            val scaled = Bitmap.createScaledBitmap(bitmap, targetWidth, targetHeight, true)
+            
+            val matrix = android.graphics.Matrix()
+            matrix.preScale(-1.0f, 1.0f)
+            val flipped = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, false)
+            
+            val scaled = Bitmap.createScaledBitmap(flipped, targetWidth, targetHeight, true)
             val buffer = bitmapToI420(scaled) ?: return
             
             val frameDelay = 1000L / (if (fps > 0) fps else 30)
