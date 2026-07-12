@@ -7,6 +7,8 @@ This is a fork of [ShiggyXposed](https://github.com/kmmiio99o/ShiggyXposed) (kmm
 ### Added in this fork
 
 - **`BubbleModule` (native rounded chat bubbles).** Hooks Discord's native `com.discord.chat.presentation.message.MessageView` and paints a rounded `GradientDrawable` behind each message plus rounds the avatar. This is the piece the client's `bubblemodule.ts` shim never had a native half for. Ported from [rainXposed](https://github.com/ra1ncord/rainXposed). On by default; exposes `bubbles.hook` / `bubbles.unhook` / `bubbles.configure` bridge methods.
+- **`VirtualCameraModule` (custom WebRTC camera feed).** Hooks `org.webrtc.Camera1Capturer` and `Camera2Capturer` to intercept the video feed and stream a custom local video/image file instead of your real camera. Exposes the `camera.setMedia` bridge method to configure the file path.
+- **`MediaPickerModule` (native file picker).** Provides a native Intent hook for selecting files using Android's built-in file picker (`ACTION_GET_CONTENT`) and exposes the result via `mediaPicker.start` and `mediaPicker.poll` on the bridge.
 - Release builds are signed in CI from a keystore held in encrypted GitHub Actions secrets (never committed) and published to Releases, so the Manager can pull them and update-over-install keeps the same signature.
 
 You don't need root: [Placeholder Manager](https://github.com/witorsell/PlaceholderManager) embeds this module into Discord with LSPatch.
