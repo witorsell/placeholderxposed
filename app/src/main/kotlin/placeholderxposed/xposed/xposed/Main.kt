@@ -39,7 +39,6 @@ object HookStateHolder {
 class Main : Module(), IXposedHookLoadPackage, IXposedHookZygoteInit {
     private var hooked = false
     private val modules = mutableListOf(
-        RnFlagsModule,
         HookScriptLoaderModule,
         BridgeModule,
         AdditionalBridgeMethodsModule,

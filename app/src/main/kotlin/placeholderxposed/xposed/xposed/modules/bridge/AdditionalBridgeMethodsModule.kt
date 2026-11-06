@@ -49,8 +49,6 @@ object AdditionalBridgeMethodsModule : Module() {
             file.writeText(contents as String)
         }
 
-        ProfilerBridge.register(this)
-
         BridgeModule.registerMethod("app.reload") {
             reloadApp()
             null
@@ -58,8 +56,6 @@ object AdditionalBridgeMethodsModule : Module() {
     }
 
     override fun onActivity(activity: Activity) = with(activity) {
-        ProfilerBridge.installKeyTrigger(activity)
-
         BridgeModule.registerMethod("alertError") {
             val (error, version) = it
             val app = getAppInfo()
