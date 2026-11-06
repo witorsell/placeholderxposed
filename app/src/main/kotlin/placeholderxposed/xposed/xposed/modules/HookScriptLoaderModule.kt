@@ -44,12 +44,7 @@ object HookScriptLoaderModule : Module() {
         preloadsDir = File(filesDir, PRELOADS_DIR).apply { asDir() }
         mainScript = File(cacheDir, Constants.MAIN_SCRIPT_FILE).apply { asFile() }
 
-        listOf(
-            "com.facebook.react.runtime.ReactInstance\$loadJSBundle$1",
-            "com.facebook.react.runtime.ReactInstance$1",
-            // Backward-compat for versions < 351011 (e.g., 349009, 350008) that still use CatalystInstanceImpl
-            "com.facebook.react.bridge.CatalystInstanceImpl"
-        ).mapNotNull { classLoader.safeLoadClass(it) }.forEach { hook(it) }
+        ScriptDelegates.install(classLoader) { hook(it) }
     }
 
     private fun hook(instance: Class<*>) = runCatching {
