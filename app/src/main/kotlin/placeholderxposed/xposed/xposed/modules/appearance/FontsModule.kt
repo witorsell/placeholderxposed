@@ -7,6 +7,7 @@ import android.graphics.fonts.Font
 import android.graphics.fonts.FontFamily
 import android.os.Build
 import de.robv.android.xposed.XC_MethodReplacement
+import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import placeholderxposed.xposed.Constants
@@ -45,6 +46,8 @@ object FontsModule : Module() {
         "com.facebook.react.common.assets.ReactFontManager\$Companion",
     )
 
+    private val typefaceCache = java.util.concurrent.ConcurrentHashMap<String, Typeface>()
+
     private var fontsDir: File? = null
     private var fontsDownloadsDir: File? = null
     private var fontsAbsPath: String? = null
@@ -65,7 +68,17 @@ object FontsModule : Module() {
                     else -> styleFromFontStyle(styleArg)
                 }
                 val assetManager: AssetManager = param.args[2] as AssetManager
-                return createAssetTypeface(fontFamilyName, style, assetManager)
+
+                // Without a custom font pack there is nothing for us to change, and Discord's own
+                // lookup caches its typefaces. Replacing it with ours rebuilt a Typeface from the
+                // asset files on every text measure, which was most of the UI lag on 352.
+                if (fontsAbsPath == null && !fontFamilyName.contains(':')) {
+                    return XposedBridge.invokeOriginalMethod(param.method, param.thisObject, param.args) as Typeface?
+                }
+
+                val key = "$fontFamilyName|$style"
+                typefaceCache[key]?.let { return it }
+                return createAssetTypeface(fontFamilyName, style, assetManager)?.also { typefaceCache[key] = it }
             }
         }
 

@@ -31,12 +31,10 @@ object RnFlagsModule : Module() {
     /** Flags whose provider method we hooked, for the profiler report. */
     val applied = java.util.Collections.synchronizedList(mutableListOf<String>())
 
-    private val PRESET = mapOf(
-        "enableAndroidTextMeasurementOptimizations" to true,
-        "enableDoubleMeasurementFixAndroid" to true,
-        "useLISAlgorithmInDifferentiator" to true,
-        "enableDifferentiatorMutationVectorPreallocation" to true,
-    )
+    // Empty by default. The first four candidates (text measurement optimizations, double
+    // measurement fix, LIS differentiator, mutation vector preallocation) made no measurable
+    // difference in a 352.17 profile, so they stay opt-in through rn_flags.json.
+    private val PRESET = emptyMap<String, Boolean>()
 
     override fun onLoad(packageParam: XC_LoadPackage.LoadPackageParam) = with(packageParam) {
         val config = readConfig(File(appInfo.dataDir, "${Constants.FILES_DIR}/rn_flags.json"))
@@ -46,6 +44,7 @@ object RnFlagsModule : Module() {
         }
 
         val flags = PRESET + config.flags
+        if (flags.isEmpty()) return@with
         val cxx = classLoader.safeLoadClass(CXX)
         if (cxx == null) {
             Log.e("RnFlags: $CXX not found")
