@@ -23,12 +23,22 @@ import java.io.File
 object PerfPatchesModule : Module() {
     private const val FILE_NAME = "perf_patches.js"
 
+    // Off while we check whether the preload is what makes 352 feel slow. It wraps every console
+    // call in a timer and delays kv reads, and it only helps if the old symbols it targets exist.
+    private const val ENABLED = false
+
     override fun onLoad(packageParam: XC_LoadPackage.LoadPackageParam) {
         try {
             // Build preloads path inside the app data files directory
             val filesDir = File(packageParam.appInfo.dataDir, Constants.FILES_DIR).apply { mkdirs() }
             val preloadsDir = File(filesDir, HookScriptLoaderModule.PRELOADS_DIR).apply { mkdirs() }
             val out = File(preloadsDir, FILE_NAME)
+
+            if (!ENABLED) {
+                // An older install may have left the preload behind, and preloads run on every launch.
+                if (out.exists() && out.delete()) Log.i("PerfPatchesModule: removed stale preload")
+                return
+            }
 
             // Defensive JS runtime patch. Avoid template literals with ${} to prevent Kotlin interpolation.
             val js = """
@@ -312,6 +322,6 @@ object PerfPatchesModule : Module() {
 
     @Deprecated("Overrides deprecated Module.buildPayload")
     override fun buildPayload(builder: JsonObjectBuilder) {
-        builder.put("perfPatches", true)
+        builder.put("perfPatches", ENABLED)
     }
 }
