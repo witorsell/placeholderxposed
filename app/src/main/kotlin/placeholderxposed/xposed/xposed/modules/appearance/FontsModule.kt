@@ -40,10 +40,16 @@ object FontsModule : Module() {
     private val FILE_EXTENSIONS = arrayOf(".ttf", ".otf")
     private const val FONTS_ASSET_PATH = "fonts/"
 
-    private lateinit var fontsDir: File
-    private lateinit var fontsDownloadsDir: File
+    private val FONT_MANAGER_CLASSES = arrayOf(
+        "com.facebook.react.views.text.ReactFontManager\$Companion",
+        "com.facebook.react.common.assets.ReactFontManager\$Companion",
+    )
+
+    private var fontsDir: File? = null
+    private var fontsDownloadsDir: File? = null
     private var fontsAbsPath: String? = null
 
+    @Deprecated("This will be removed in future versions. Payloads can be replaced via synchronous bridge methods.")
     override fun buildPayload(builder: JsonObjectBuilder) {
         builder.apply {
             put("fontPatch", 2)
@@ -51,21 +57,56 @@ object FontsModule : Module() {
     }
 
     override fun onLoad(packageParam: XC_LoadPackage.LoadPackageParam) = with(packageParam) {
-        XposedHelpers.findAndHookMethod(
-            "com.facebook.react.views.text.ReactFontManager\$Companion",
-            classLoader,
-            "createAssetTypeface",
-            String::class.java,
-            Int::class.java,
-            "android.content.res.AssetManager",
-            object : XC_MethodReplacement() {
-                override fun replaceHookedMethod(param: MethodHookParam): Typeface? {
-                    val fontFamilyName: String = param.args[0].toString()
-                    val style: Int = param.args[1] as Int
-                    val assetManager: AssetManager = param.args[2] as AssetManager
-                    return createAssetTypeface(fontFamilyName, style, assetManager)
+        val replacement = object : XC_MethodReplacement() {
+            override fun replaceHookedMethod(param: MethodHookParam): Typeface? {
+                val fontFamilyName: String = param.args[0].toString()
+                val style = when (val styleArg = param.args[1]) {
+                    is Int -> styleArg
+                    else -> styleFromFontStyle(styleArg)
                 }
-            })
+                val assetManager: AssetManager = param.args[2] as AssetManager
+                return createAssetTypeface(fontFamilyName, style, assetManager)
+            }
+        }
+
+        // React Native moved ReactFontManager between releases, so try every known package.
+        // Never let this throw: an uncaught error here aborts the whole module chain.
+        val hooked = FONT_MANAGER_CLASSES.any { className ->
+            runCatching {
+                XposedHelpers.findAndHookMethod(
+                    className,
+                    classLoader,
+                    "createAssetTypeface",
+                    String::class.java,
+                    Int::class.java,
+                    "android.content.res.AssetManager",
+                    replacement
+                )
+            }.onFailure { Log.e("Failed to hook createAssetTypeface on $className", it) }
+                .isSuccess
+        }
+
+        // Discord 352+ ships an obfuscated RN font manager. Its public entry point is
+        // il.c.a(String fontFamilyName, il.b fontStyle, AssetManager).
+        val newFontManager = classLoader.safeLoadClass("il.c")
+        val newFontStyle = classLoader.safeLoadClass("il.b")
+        val newHooked = if (newFontManager != null && newFontStyle != null) {
+            runCatching {
+                XposedHelpers.findAndHookMethod(
+                    newFontManager,
+                    "a",
+                    String::class.java,
+                    newFontStyle,
+                    AssetManager::class.java,
+                    replacement
+                )
+            }.onFailure { Log.e("Failed to hook il.c.a", it) }
+                .isSuccess
+        } else false
+
+        if (!hooked && !newHooked) {
+            Log.e("Failed to hook createAssetTypeface on all known font manager classes")
+        }
 
         val fontDefFile = File(appInfo.dataDir, "${Constants.FILES_DIR}/fonts.json").apply { asFile() }
         if (!fontDefFile.exists()) return@with
@@ -76,11 +117,14 @@ object FontsModule : Module() {
             return@with
         }
 
-        fontsDownloadsDir = File(appInfo.dataDir, "${Constants.FILES_DIR}/downloads/fonts").apply { asDir() }
-        fontsDir = File(fontsDownloadsDir, fontDef.name!!).apply { asDir() }
-        fontsAbsPath = fontsDir.absolutePath + "/"
+        val fontName = fontDef.name ?: return@with
+        val downloadsDir = File(appInfo.dataDir, "${Constants.FILES_DIR}/downloads/fonts").apply { asDir() }
+        val setDir = File(downloadsDir, fontName).apply { asDir() }
+        fontsDownloadsDir = downloadsDir
+        fontsDir = setDir
+        fontsAbsPath = setDir.absolutePath + "/"
 
-        fontsDir.listFiles()?.forEach { file ->
+        setDir.listFiles()?.forEach { file ->
             val fileName = file.name
             if (!fileName.startsWith(".")) {
                 val fontName = fileName.split('.')[0]
@@ -99,7 +143,8 @@ object FontsModule : Module() {
                     try {
                         Log.i("Downloading $name from $url")
                         val file =
-                            File(fontsDir, "$name${FILE_EXTENSIONS.first { url.endsWith(it) }}").apply { asFile() }
+                            File(downloadsDir, "$fontName/$name${FILE_EXTENSIONS.first { url.endsWith(it) }}")
+                                .apply { asFile() }
                         if (file.exists()) return@async
 
                         val client = HttpClient(CIO) {
@@ -128,8 +173,7 @@ object FontsModule : Module() {
             for (fontFamilyName in fontFamilyNames) {
                 try {
                     for (fileExtension in FILE_EXTENSIONS) {
-                        val (customName, refName) = fontFamilyName.split(":")
-                        val file = File(fontsDownloadsDir, "$customName/$refName.$fileExtension").apply { asFile() }
+                        val file = customFontFile(fontFamilyName, fileExtension) ?: continue
                         val font = Font.Builder(file).build()
                         val family = FontFamily.Builder(font).build()
                         fontFamilies.add(family)
@@ -193,13 +237,12 @@ object FontsModule : Module() {
             }
         }
 
-        val extension = EXTENSIONS[style]
+        val extension = EXTENSIONS.getOrElse(style) { "" }
 
         try {
             for (fileExtension in FILE_EXTENSIONS) {
-                val (customName, refName) = fontFamilyName.split(":")
-                val file = File(fontsDownloadsDir, "$customName/$refName.$fileExtension").apply { asFile() }
-                if (!file.exists()) throw Exception()
+                val file = customFontFile(fontFamilyName, fileExtension) ?: continue
+                if (!file.exists()) continue
                 return Typeface.createFromFile(file.absolutePath)
             }
         } catch (_: Throwable) {
@@ -224,5 +267,35 @@ object FontsModule : Module() {
         }
 
         return Typeface.create(fontFamilyName, style)
+    }
+
+    private fun customFontFile(fontFamilyName: String, fileExtension: String): File? {
+        val parts = fontFamilyName.split(":")
+        if (parts.size != 2) return null
+        val downloadsDir = fontsDownloadsDir ?: return null
+        return File(downloadsDir, "${parts[0]}/${parts[1]}$fileExtension")
+    }
+
+    /**
+     * Discord 352+ passes a font-style holder object instead of the old RN style enum.
+     * It exposes a weight int and an italic boolean; translate them back to RN's style index.
+     */
+    private fun styleFromFontStyle(fontStyle: Any?): Int {
+        if (fontStyle == null) return 0
+        return runCatching {
+            val fields = fontStyle.javaClass.declaredFields
+            val italic = fields.firstOrNull { it.type == Boolean::class.javaPrimitiveType }
+                ?.apply { isAccessible = true }
+                ?.getBoolean(fontStyle) ?: false
+            val weight = fields.firstOrNull { it.type == Int::class.javaPrimitiveType }
+                ?.apply { isAccessible = true }
+                ?.getInt(fontStyle) ?: 400
+
+            if (weight >= 700) {
+                if (italic) 3 else 1
+            } else {
+                if (italic) 2 else 0
+            }
+        }.getOrDefault(0)
     }
 }

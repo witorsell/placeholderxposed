@@ -125,7 +125,7 @@ object LogBoxActions {
         scope.launch(Dispatchers.IO) {
             try {
                 val pyoncordDir = LogBoxUtils.getPyoncordDirectory(context)
-                val bundleFile = File(pyoncordDir, "bundle.js")
+                val bundleFile = File(context.dataDir, "${Constants.CACHE_DIR}/${Constants.MAIN_SCRIPT_FILE}")
                 val configFile = File(pyoncordDir, "loader.json")
 
                 bundleFile.delete()
@@ -174,7 +174,9 @@ object LogBoxActions {
             configFile.writeText(config.toString())
 
             if (enabled) {
-                File(pyoncordDir, "bundle.js").delete()
+                val cacheDir = File(context.dataDir, Constants.CACHE_DIR)
+                val bundleFile = File(cacheDir, Constants.MAIN_SCRIPT_FILE)
+                bundleFile.delete()
                 Toast.makeText(context, "Custom bundle enabled", Toast.LENGTH_SHORT).show()
             } else {
                 Toast.makeText(context, "Custom bundle disabled", Toast.LENGTH_SHORT).show()
@@ -184,6 +186,24 @@ object LogBoxActions {
         } catch (e: Exception) {
             Log.e("Error setting custom bundle URL: ${e.message}")
             showError(context, "Failed to save configuration", e.message)
+        }
+    }
+
+    fun deleteDevtools(context: Context) {
+        try {
+            val devtoolsFile = File(LogBoxUtils.getPyoncordDirectory(context), "preloads/reactDevtools.js")
+            if (devtoolsFile.exists()) {
+                if (devtoolsFile.delete()) {
+                    Toast.makeText(context, "Devtools deleted", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "Failed to delete Devtools", Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                Toast.makeText(context, "Devtools not found", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            Log.e("Error deleting Devtools: ${e.message}")
+            showError(context, "Failed to delete Devtools", e.message)
         }
     }
 

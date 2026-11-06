@@ -47,7 +47,7 @@ object HookScriptLoaderModule : Module() {
         listOf(
             "com.facebook.react.runtime.ReactInstance\$loadJSBundle$1",
             "com.facebook.react.runtime.ReactInstance$1",
-            // TODO: Remove once Discord fully switches to Bridgeless
+            // Backward-compat for versions < 351011 (e.g., 349009, 350008) that still use CatalystInstanceImpl
             "com.facebook.react.bridge.CatalystInstanceImpl"
         ).mapNotNull { classLoader.safeLoadClass(it) }.forEach { hook(it) }
     }
@@ -85,7 +85,7 @@ object HookScriptLoaderModule : Module() {
             val ready = async { HookStateHolder.readyDeferred.join() }
             val isCustomUrl = UpdaterModule.isCustomUrlEnabled
 
-            if (!mainScript.exists() || isCustomUrl) {
+            if (!mainScript.exists()) {
                 val reason = if (isCustomUrl) "Custom URL enabled" else "Main script does not exist"
                 Log.i("$reason, downloading before load...")
                 val download =

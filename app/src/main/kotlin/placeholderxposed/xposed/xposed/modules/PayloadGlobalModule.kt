@@ -8,6 +8,7 @@ import placeholderxposed.xposed.BuildConfig
 import placeholderxposed.xposed.Constants
 import placeholderxposed.xposed.Module
 import placeholderxposed.xposed.Utils.Companion.JSON
+import placeholderxposed.xposed.Utils.Log
 import placeholderxposed.xposed.modules.HookScriptLoaderModule.PRELOADS_DIR
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -23,7 +24,11 @@ class PayloadGlobalModule(private val modules: List<Module>) : Module() {
         buildJsonObject {
             put("loaderName", Constants.LOADER_NAME)
             put("loaderVersion", BuildConfig.VERSION_NAME)
-            @Suppress("DEPRECATION") for (module in modules) module.buildPayload(this)
+            @Suppress("DEPRECATION") for (module in modules) runCatching {
+                module.buildPayload(this)
+            }.onFailure {
+                Log.e("Module ${module.javaClass.simpleName} failed while building payload", it)
+            }
         })
 
     override fun onLoad(packageParam: XC_LoadPackage.LoadPackageParam) = with(packageParam) {
