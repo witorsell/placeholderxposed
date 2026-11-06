@@ -49,6 +49,8 @@ object AdditionalBridgeMethodsModule : Module() {
             file.writeText(contents as String)
         }
 
+        ProfilerBridge.register(this)
+
         BridgeModule.registerMethod("app.reload") {
             reloadApp()
             null
