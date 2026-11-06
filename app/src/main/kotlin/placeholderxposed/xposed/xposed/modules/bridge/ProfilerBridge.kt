@@ -1,6 +1,15 @@
 package placeholderxposed.xposed.modules.bridge
 
+import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
+import android.view.KeyEvent
+import android.widget.Toast
+import de.robv.android.xposed.XC_MethodHook
+import de.robv.android.xposed.XposedBridge
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -30,6 +39,62 @@ object ProfilerBridge {
             call(loader, "dumpSampledTraceToFile", out.absolutePath)
             summarize(out)
         }
+    }
+
+    private var keyTriggerInstalled = false
+    private var profiling = false
+
+    /**
+     * Hold Volume Down for about a second to start sampling, hold it again to stop. The summary goes
+     * to the clipboard. Works without the JS bridge, so it still runs when bridge calls don't land.
+     */
+    fun installKeyTrigger(activity: Activity) {
+        if (keyTriggerInstalled) return
+        keyTriggerInstalled = true
+
+        val loader = activity.classLoader
+        val app = activity.applicationContext
+        val main = Handler(Looper.getMainLooper())
+
+        fun toast(text: String) = main.post { Toast.makeText(app, text, Toast.LENGTH_LONG).show() }
+
+        val hook = object : XC_MethodHook() {
+            override fun beforeHookedMethod(param: MethodHookParam) {
+                val event = param.args[0] as? KeyEvent ?: return
+                if (event.keyCode != KeyEvent.KEYCODE_VOLUME_DOWN) return
+                if (event.action != KeyEvent.ACTION_DOWN || event.repeatCount != 12) return
+
+                if (!profiling) {
+                    runCatching { call(loader, "enable") }
+                        .onSuccess {
+                            profiling = true
+                            toast("Profiling. Scroll and tap around, then hold Volume Down again.")
+                        }
+                        .onFailure { toast("Profiler start failed: ${it.cause ?: it}") }
+                } else {
+                    profiling = false
+                    toast("Stopping profiler...")
+                    Thread {
+                        val out = File(app.cacheDir, "hermes_profile.json")
+                        val summary = runCatching {
+                            call(loader, "disable")
+                            call(loader, "dumpSampledTraceToFile", out.absolutePath)
+                            summarize(out)
+                        }.getOrElse { "profiler stop failed: ${it.cause ?: it}" }
+
+                        summary.lines().chunked(12).forEach { Log.i("profile\n" + it.joinToString("\n")) }
+                        main.post {
+                            val clipboard = app.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("profile", summary))
+                            Toast.makeText(app, "Profile copied to the clipboard.", Toast.LENGTH_LONG).show()
+                        }
+                    }.start()
+                }
+            }
+        }
+
+        XposedBridge.hookMethod(Activity::class.java.getDeclaredMethod("dispatchKeyEvent", KeyEvent::class.java), hook)
+        Log.i("Profiler key trigger installed (hold Volume Down)")
     }
 
     private fun call(loader: ClassLoader, name: String, vararg args: String) {

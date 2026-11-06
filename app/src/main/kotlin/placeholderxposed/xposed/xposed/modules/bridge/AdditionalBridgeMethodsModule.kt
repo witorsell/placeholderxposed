@@ -58,6 +58,8 @@ object AdditionalBridgeMethodsModule : Module() {
     }
 
     override fun onActivity(activity: Activity) = with(activity) {
+        ProfilerBridge.installKeyTrigger(activity)
+
         BridgeModule.registerMethod("alertError") {
             val (error, version) = it
             val app = getAppInfo()
