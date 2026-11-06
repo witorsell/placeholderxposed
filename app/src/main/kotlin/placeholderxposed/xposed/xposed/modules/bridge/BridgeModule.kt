@@ -90,12 +90,16 @@ object BridgeModule : Module() {
             .hookMethod("readAsDataURL", readableMap, promise) {
                 before {
                     val (readableMap, promise) = args
-                    callBridgeMethod(readableMapToHashMap(readableMap!!))?.let {
+                    val map = readableMapToHashMap(readableMap!!)
+                    val reply = callBridgeMethod(map)
+                    Log.i("Bridge readAsDataURL keys=${map.keys} intercepted=${reply != null}")
+                    reply?.let {
                         promiseResolve.invoke(promise, it.toNativeObject())
                         result = null
                     }
                 }
             }
+        Log.i("Bridge hooked FileReaderModule.readAsDataURL")
 
         // Clear methods every package load. Plugins should re-register on each load.
         methods.clear()
