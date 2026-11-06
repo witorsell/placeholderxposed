@@ -48,7 +48,7 @@ typealias BridgeMethodArgs = ArrayList<Any>
 object BridgeModule : Module() {
     private lateinit var readableMapGetString: Method
     private lateinit var readableMapToHashMap: Method
-    private lateinit var argumentsMakeNative: Method
+    private lateinit var argumentsMakeNativeMap: Method
 
     private const val CALL_DATA_KEY = "Placeholder"
     private const val METHOD_NAME_KEY = "method"
@@ -75,14 +75,17 @@ object BridgeModule : Module() {
         val promise = classLoader.loadClass("com.facebook.react.bridge.Promise")
 
         val promiseResolve = promise.method("resolve", Object::class.java)
-        argumentsMakeNative = arguments.method("makeNativeObject", Object::class.java)
+        // makeNativeObject is a private instance method on Kotlin's Arguments object in newer React
+        // Native, so calling it statically throws. makeNativeMap(Map) is still public and static and
+        // converts nested maps and lists itself.
+        argumentsMakeNativeMap = arguments.method("makeNativeMap", Map::class.java)
         readableMapGetString = readableMap.method("getString", String::class.java)
         readableMapToHashMap = readableMap.method("toHashMap")
 
         classLoader.loadClass("com.horcrux.svg.RNSVGRenderableManager")
             .hookMethod("getBBox", Double::class.javaObjectType, readableMap) {
                 before {
-                    callBridgeMethod(readableMapToHashMap(args[1]!!))?.let { result = it.toNativeObject() }
+                    callBridgeMethod(readableMapToHashMap(args[1]!!))?.let { result = it.toNativeMap() }
                 }
             }
 
@@ -90,16 +93,12 @@ object BridgeModule : Module() {
             .hookMethod("readAsDataURL", readableMap, promise) {
                 before {
                     val (readableMap, promise) = args
-                    val map = readableMapToHashMap(readableMap!!)
-                    val reply = callBridgeMethod(map)
-                    Log.i("Bridge readAsDataURL keys=${map.keys} intercepted=${reply != null}")
-                    reply?.let {
-                        promiseResolve.invoke(promise, it.toNativeObject())
+                    callBridgeMethod(readableMapToHashMap(readableMap!!))?.let {
+                        promiseResolve.invoke(promise, it.toNativeMap())
                         result = null
                     }
                 }
             }
-        Log.i("Bridge hooked FileReaderModule.readAsDataURL")
 
         // Clear methods every package load. Plugins should re-register on each load.
         methods.clear()
@@ -131,12 +130,7 @@ object BridgeModule : Module() {
         }
     }
 
-    private fun Any?.toNativeObject(): Any? = argumentsMakeNative.invoke(
-        null, when (this) {
-            Unit -> null
-            else -> this
-        }
-    )
+    private fun Map<String, Any?>.toNativeMap(): Any? = argumentsMakeNativeMap.invoke(null, this)
 
     private fun readableMapToHashMap(map: Any): HashMap<String, Any?> {
         @Suppress("UNCHECKED_CAST") return readableMapToHashMap.invoke(map) as HashMap<String, Any?>
@@ -144,7 +138,7 @@ object BridgeModule : Module() {
 
     private fun callBridgeMethod(hashMap: HashMap<String, Any?>): Map<String, Any?>? = try {
         val (method, args) = getBridgeCallData(hashMap) ?: return null
-        val ret = method(args).toNativeObject()
+        val ret = method(args).let { if (it == Unit) null else it }
         mapOf("result" to ret)
     } catch (e: Throwable) {
         mapOf("error" to e.stackTraceToString())
