@@ -28,6 +28,9 @@ import java.io.File
 object RnFlagsModule : Module() {
     private const val CXX = "com.facebook.react.internal.featureflags.ReactNativeFeatureFlagsCxxInterop"
 
+    /** Flags whose provider method we hooked, for the profiler report. */
+    val applied = java.util.Collections.synchronizedList(mutableListOf<String>())
+
     private val PRESET = mapOf(
         "enableAndroidTextMeasurementOptimizations" to true,
         "enableDoubleMeasurementFixAndroid" to true,
@@ -57,6 +60,7 @@ object RnFlagsModule : Module() {
                     runCatching {
                         cls.method(name).hook { before { result = value } }
                     }.onSuccess {
+                        applied.add("$name=$value")
                         Log.i("RnFlags ${cls.name}.$name -> $value")
                     }.onFailure {
                         Log.e("RnFlags $name not hookable on ${cls.name}: ${it.message}")

@@ -16,6 +16,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import placeholderxposed.xposed.Utils.Log
+import placeholderxposed.xposed.modules.RnFlagsModule
 import java.io.File
 
 /**
@@ -29,20 +30,31 @@ object ProfilerBridge {
         val loader = context.classLoader
 
         BridgeModule.registerMethod("profiler.start") {
-            call(loader, "enable")
+            startSampling(loader)
             true
         }
 
         BridgeModule.registerMethod("profiler.stop") {
-            val out = File(context.cacheDir, "hermes_profile.json")
-            call(loader, "disable")
-            call(loader, "dumpSampledTraceToFile", out.absolutePath)
-            summarize(out)
+            stopSampling(loader, File(context.cacheDir, "hermes_profile.json"))
         }
     }
 
     private var keyTriggerInstalled = false
     private var profiling = false
+    private var sampler: ThreadSampler? = null
+
+    private fun startSampling(loader: ClassLoader) {
+        call(loader, "enable")
+        sampler = ThreadSampler().also { it.start() }
+    }
+
+    private fun stopSampling(loader: ClassLoader, out: File): String {
+        val javaReport = sampler?.finish() ?: "(no java sampler)"
+        sampler = null
+        call(loader, "disable")
+        call(loader, "dumpSampledTraceToFile", out.absolutePath)
+        return "RN flags: ${RnFlagsModule.applied.ifEmpty { listOf("none applied") }}\n" + summarize(out) + "\n== java threads ==\n" + javaReport
+    }
 
     /**
      * Hold Volume Down for about a second to start sampling, hold it again to stop. The summary goes
@@ -65,7 +77,7 @@ object ProfilerBridge {
                 if (event.action != KeyEvent.ACTION_DOWN || event.repeatCount != 12) return
 
                 if (!profiling) {
-                    runCatching { call(loader, "enable") }
+                    runCatching { startSampling(loader) }
                         .onSuccess {
                             profiling = true
                             toast("Profiling. Scroll and tap around, then hold Volume Down again.")
@@ -76,11 +88,7 @@ object ProfilerBridge {
                     toast("Stopping profiler...")
                     Thread {
                         val out = File(app.cacheDir, "hermes_profile.json")
-                        val summary = runCatching {
-                            call(loader, "disable")
-                            call(loader, "dumpSampledTraceToFile", out.absolutePath)
-                            summarize(out)
-                        }.getOrElse { "profiler stop failed: ${it.cause ?: it}" }
+                        val summary = runCatching { stopSampling(loader, out) }.getOrElse { "profiler stop failed: ${it.cause ?: it}" }
 
                         summary.lines().chunked(12).forEach { Log.i("profile\n" + it.joinToString("\n")) }
                         main.post {
