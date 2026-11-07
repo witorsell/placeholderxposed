@@ -7,6 +7,7 @@ import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.InsetDrawable
 import android.os.Build
 import java.io.File
+import java.util.WeakHashMap
 import org.json.JSONObject
 import android.view.View
 import android.view.ViewGroup
@@ -22,6 +23,7 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
 import placeholderxposed.xposed.Module
+import placeholderxposed.xposed.Utils.Log
 import placeholderxposed.xposed.modules.bridge.BridgeModule
 import placeholderxposed.xposed.px
 
@@ -106,51 +108,57 @@ object BubbleModule : Module() {
 
         try {
             val methods = messageViewClass.declaredMethods
-            val configureAccessoriesMarginMethod = methods.find { it.name == "configureAccessoriesMargin" }
-            val configureAuthorMethod = methods.find { it.name == "configureAuthor" }
 
-            if (configureAccessoriesMarginMethod != null) {
-                configureAccessoriesMarginHook = XposedBridge.hookMethod(configureAccessoriesMarginMethod, object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: XC_MethodHook.MethodHookParam) {
-                        if (!hooksEnabled) return
-                        val binding = XposedHelpers.getObjectField(param.thisObject, "binding")
-                        val accessoriesView = binding?.javaClass?.getField("accessoriesView")?.get(binding) as? ViewGroup
-                        accessoriesView?.let { adjustMarginsForAccessories(it) }
-                    }
-                })
-            } else {
-                XposedBridge.log("[BubbleModule] configureAccessoriesMargin method not found")
+            // Discord 352 obfuscated MessageView's methods (configureAuthor is now `b`/`f`), but the
+            // bind methods still take the unobfuscated com.discord.chat.bridge.Message first, so find
+            // them by that. The old names stay as a fallback for earlier builds.
+            val bindMethods = methods.filter { it.parameterTypes.firstOrNull()?.name == "com.discord.chat.bridge.Message" }
+                .ifEmpty { methods.filter { it.name == "configureAuthor" || it.name == "configureAccessoriesMargin" } }
+
+            if (bindMethods.isEmpty()) {
+                Log.e("BubbleModule: no bind methods found on MessageView")
+                findAlternativeMessageClasses(param.classLoader)
+                return
             }
 
-            if (configureAuthorMethod != null) {
-                configureAuthorHook = XposedBridge.hookMethod(configureAuthorMethod, object : XC_MethodHook() {
+            for (method in bindMethods) {
+                XposedBridge.hookMethod(method, object : XC_MethodHook() {
                     override fun afterHookedMethod(param: XC_MethodHook.MethodHookParam) {
                         maybeReloadConfig()
                         if (!hooksEnabled) return
-                        val view = param.thisObject as ViewGroup
-                        applyRoundedSquareProfilePicture(view)
-                        applyBubbleChat(view)
+                        val view = param.thisObject as? ViewGroup ?: return
+                        runCatching {
+                            // Idempotent, so it doesn't matter that more than one bind method fires per bind.
+                            findAccessoriesView(view)?.let { adjustMarginsForAccessories(it) }
+                            applyRoundedSquareProfilePicture(view)
+                            applyBubbleChat(view)
+                        }.onFailure { Log.e("BubbleModule: applying bubbles failed", it) }
                     }
                 })
-            } else {
-                XposedBridge.log("[BubbleModule] configureAuthor method not found")
             }
 
+            Log.i("BubbleModule: hooked ${bindMethods.size} MessageView method(s): ${bindMethods.joinToString { it.name }}")
             hooked = true
         } catch (e: Throwable) {
-            XposedBridge.log("[BubbleModule] Failed to hook methods: ${e.message}")
-            e.printStackTrace()
+            Log.e("BubbleModule: failed to hook MessageView", e)
         }
     }
 
+    private fun findAccessoriesView(view: ViewGroup): ViewGroup? =
+        view.children.firstOrNull { it.javaClass.simpleName == "MessageAccessoriesView" } as? ViewGroup
+
+    // Original top padding of each accessories view, so repeated binds don't keep adding to it.
+    private val accessoriesBasePaddingTop = WeakHashMap<View, Int>()
+
     private fun adjustMarginsForAccessories(view: ViewGroup) {
-        val marginLayoutParams = view.layoutParams as MarginLayoutParams
+        val marginLayoutParams = view.layoutParams as? MarginLayoutParams ?: return
         val topMargin = marginLayoutParams.topMargin
+        val basePadding = accessoriesBasePaddingTop.getOrPut(view) { view.paddingTop }
 
         marginLayoutParams.setMargins(marginLayoutParams.leftMargin, 0, marginLayoutParams.rightMargin, marginLayoutParams.bottomMargin)
         view.layoutParams = marginLayoutParams
 
-        view.setPadding(view.paddingLeft, topMargin + view.paddingTop, view.paddingRight, view.paddingBottom)
+        view.setPadding(view.paddingLeft, topMargin + basePadding, view.paddingRight, view.paddingBottom)
     }
 
     // Depth-first search for the first ImageView. rain assumed the avatar was a direct child
@@ -177,7 +185,9 @@ object BubbleModule : Module() {
     }
 
     private fun applyRoundedSquareProfilePicture(viewGroup: ViewGroup) {
-        val imageView = viewGroup.children.filterIsInstance<ImageView>().firstOrNull()
+        val avatarId = viewGroup.resources.getIdentifier("author_avatar", "id", viewGroup.context.packageName)
+        val imageView = (if (avatarId != 0) viewGroup.findViewById<View>(avatarId) as? ImageView else null)
+            ?: viewGroup.children.filterIsInstance<ImageView>().firstOrNull()
             ?: findFirstImageView(viewGroup)
             ?: return
         imageView.apply {
@@ -232,33 +242,34 @@ object BubbleModule : Module() {
 
     private fun setAccessoryBubbleBackground(accessoriesView: ViewGroup, start: Boolean) {
         try {
-            val messageAccessoriesDecoration = accessoriesView.javaClass
-                .getDeclaredField("messageAccessoriesDecoration").apply { isAccessible = true }.get(accessoriesView)
-            val leftMarginPx = try {
-                messageAccessoriesDecoration.javaClass.getDeclaredField("leftMarginPx").apply { isAccessible = true }.get(messageAccessoriesDecoration) as? Int
-            } catch (e: NoSuchFieldException) {
-                try {
-                    messageAccessoriesDecoration.javaClass.getDeclaredField("leftMargin").apply { isAccessible = true }.get(messageAccessoriesDecoration) as? Int
-                } catch (e: NoSuchFieldException) {
-                    try {
-                        messageAccessoriesDecoration.javaClass.getDeclaredField("startMargin").apply { isAccessible = true }.get(messageAccessoriesDecoration) as? Int
-                    } catch (e: NoSuchFieldException) {
-                        try {
-                            val messageMargins = messageAccessoriesDecoration.javaClass.getDeclaredField("margins").apply { isAccessible = true }.get(messageAccessoriesDecoration)
-                            messageMargins.javaClass.getDeclaredField("leftMarginPx").apply { isAccessible = true }.get(messageMargins) as? Int
-                        } catch (e: NoSuchFieldException) {
-                            return
-                        }
-                    }
-                }
-            } ?: return
+            val leftMarginPx = findLeftMarginPx(accessoriesView) ?: return
 
             accessoriesView.setBubbleBackground(leftMarginPx, start, true)
             accessoriesView.setPadding(PADDING_LARGE, if (start) PADDING_MEDIUM else 0, PADDING_SMALL, PADDING_MEDIUM)
             accessoriesView.translationX = -PADDING_SMALL.toFloat()
         } catch (e: Throwable) {
-            XposedBridge.log("[BubbleModule] setAccessoryBubbleBackground failed: ${e.message}")
+            Log.e("BubbleModule: setAccessoryBubbleBackground failed", e)
         }
+    }
+
+    private val marginsRegex = Regex("leftMarginPx=(-?\\d+)")
+
+    // The accessories view keeps a MessageMargins value, but its field name is obfuscated. The data
+    // class's toString is a constant ("MessageMargins(leftMarginPx=NN, ...)"), so find it by that.
+    private fun findLeftMarginPx(accessoriesView: ViewGroup): Int? {
+        var cls: Class<*>? = accessoriesView.javaClass
+        while (cls != null && cls != ViewGroup::class.java) {
+            for (field in cls.declaredFields) {
+                if (java.lang.reflect.Modifier.isStatic(field.modifiers) || field.type.isPrimitive) continue
+                val value = runCatching { field.apply { isAccessible = true }.get(accessoriesView) }.getOrNull() ?: continue
+                val text = runCatching { value.toString() }.getOrNull() ?: continue
+                if (text.startsWith("MessageMargins(")) {
+                    return marginsRegex.find(text)?.groupValues?.get(1)?.toIntOrNull()
+                }
+            }
+            cls = cls.superclass
+        }
+        return null
     }
 
     private fun ViewGroup.setBubbleBackground(leftMargin: Int, start: Boolean, end: Boolean) {
