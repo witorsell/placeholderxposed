@@ -75,6 +75,7 @@ object BridgeModule : Module() {
         val promise = classLoader.loadClass("com.facebook.react.bridge.Promise")
 
         val promiseResolve = promise.method("resolve", Object::class.java)
+        val promiseReject = promise.method("reject", String::class.java, String::class.java)
         // makeNativeObject is a private instance method on Kotlin's Arguments object in newer React
         // Native, so calling it statically throws. makeNativeMap(Map) is still public and static and
         // converts nested maps and lists itself.
@@ -85,7 +86,9 @@ object BridgeModule : Module() {
         classLoader.loadClass("com.horcrux.svg.RNSVGRenderableManager")
             .hookMethod("getBBox", Double::class.javaObjectType, readableMap) {
                 before {
-                    callBridgeMethod(readableMapToHashMap(args[1]!!))?.let { result = it.toNativeMap() }
+                    val reply = callBridgeMethod(readableMapToHashMap(args[1]!!)) ?: return@before
+                    runCatching { result = reply.toNativeMap() }
+                        .onFailure { Log.e("Bridge reply (getBBox) could not be converted", it) }
                 }
             }
 
@@ -93,10 +96,21 @@ object BridgeModule : Module() {
             .hookMethod("readAsDataURL", readableMap, promise) {
                 before {
                     val (readableMap, promise) = args
-                    callBridgeMethod(readableMapToHashMap(readableMap!!))?.let {
-                        promiseResolve.invoke(promise, it.toNativeMap())
-                        result = null
+                    val reply = callBridgeMethod(readableMapToHashMap(readableMap!!)) ?: return@before
+
+                    // Once the payload carries our key the call is ours. If building the reply throws and
+                    // we let it escape, Xposed runs React Native's own handler and JS gets a confusing
+                    // "blob does not contain a blobId" error, so answer with the real reason instead.
+                    try {
+                        promiseResolve.invoke(promise, reply.toNativeMap())
+                    } catch (e: Throwable) {
+                        val cause = e.cause ?: e
+                        Log.e("Bridge reply could not be converted", cause)
+                        runCatching {
+                            promiseReject.invoke(promise, "E_PLACEHOLDER_BRIDGE", "Bridge reply failed: $cause")
+                        }
                     }
+                    result = null
                 }
             }
 
