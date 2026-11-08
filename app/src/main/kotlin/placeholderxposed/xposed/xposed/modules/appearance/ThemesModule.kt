@@ -41,6 +41,7 @@ object ThemesModule : Module() {
 
     private var theme: Theme? = null
     private val rawColorMap = mutableMapOf<String, Int>()
+    private val colorNameCache = java.util.concurrent.ConcurrentHashMap<Int, String>()
 
     private const val THEME_FILE = "current-theme.json"
 
@@ -127,24 +128,30 @@ object ThemesModule : Module() {
 
         val patch = MethodHookBuilder().run {
             before {
-                val resources = when {
-                    args[0] is Context -> (args[0] as Context).resources
-                    args[0] is Resources -> args[0] as Resources
-                    args.size > 1 && args[1] is Resources -> args[1] as Resources
-                    args.size > 2 && args[2] is Resources -> args[2] as Resources
-                    args.size > 1 && args[1] is View -> (args[1] as View).context.resources
-                    else -> null
-                }
                 val colorId = when {
                     args[0] is Int -> args[0] as Int
                     args.size > 1 && args[1] is Int -> args[1] as Int
-                    else -> null
+                    else -> return@before
                 }
 
-                if (resources != null && colorId != null) {
-                    val name = runCatching { resources.getResourceEntryName(colorId) }.getOrNull()
-                    if (name != null) rawColorMap[name]?.let { result = it }
+                // This runs for every color Discord resolves, many times per frame while animating.
+                // getResourceEntryName is a resource table lookup that allocates a string, so look each
+                // id up once. "" means the id has no name or no override.
+                var name = colorNameCache[colorId]
+                if (name == null) {
+                    val resources = when {
+                        args[0] is Context -> (args[0] as Context).resources
+                        args[0] is Resources -> args[0] as Resources
+                        args.size > 1 && args[1] is Resources -> args[1] as Resources
+                        args.size > 2 && args[2] is Resources -> args[2] as Resources
+                        args.size > 1 && args[1] is View -> (args[1] as View).context.resources
+                        else -> return@before
+                    }
+                    name = runCatching { resources.getResourceEntryName(colorId) }.getOrNull() ?: ""
+                    colorNameCache[colorId] = name
                 }
+
+                if (name.isNotEmpty()) rawColorMap[name]?.let { result = it }
             }
 
             build()
