@@ -15,6 +15,7 @@ import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
 import java.io.File
+import java.lang.reflect.Modifier
 
 @Serializable
 data class Author(
@@ -145,6 +146,7 @@ object ThemesModule : Module() {
                         args.size > 1 && args[1] is Resources -> args[1] as Resources
                         args.size > 2 && args[2] is Resources -> args[2] as Resources
                         args.size > 1 && args[1] is View -> (args[1] as View).context.resources
+                        args[0] is View -> (args[0] as View).context.resources
                         else -> return@before
                     }
                     name = runCatching { resources.getResourceEntryName(colorId) }.getOrNull() ?: ""
@@ -176,29 +178,27 @@ object ThemesModule : Module() {
             ).filterNotNull().forEach { it.hook(patch) }
         }
 
-        // Discord 352+ color resolver. vh.c.c(int, Theme, Resources) and vh.c.e(Context, int)
-        // are the new getColorCompat equivalents; vh.c.d(int, View) is also widely used.
+        // Discord 352+ color resolvers, picked by signature because R8 renames and reorders them per
+        // build (352 has d(int, View) and e(Context, int), 354 has d(Context, int) and e(View, int)).
         param.classLoader.safeLoadClass("vh.c")?.let { colorUtils ->
-            listOf(
-                runCatching {
-                    colorUtils.getDeclaredMethod(
-                        "c",
-                        Int::class.javaPrimitiveType,
-                        Resources.Theme::class.java,
-                        Resources::class.java,
-                    )
-                }.getOrNull(),
-                runCatching {
-                    colorUtils.getDeclaredMethod(
-                        "e", Context::class.java, Int::class.javaPrimitiveType
-                    )
-                }.getOrNull(),
-                runCatching {
-                    colorUtils.getDeclaredMethod(
-                        "d", Int::class.javaPrimitiveType, View::class.java
-                    )
-                }.getOrNull(),
-            ).filterNotNull().forEach { it.hook(patch) }
+            colorUtils.declaredMethods
+                .filter {
+                    Modifier.isStatic(it.modifiers) &&
+                        it.returnType == Int::class.javaPrimitiveType &&
+                        isColorIdResolver(it.parameterTypes)
+                }
+                .forEach { it.hook(patch) }
+        }
+    }
+
+    private fun isColorIdResolver(p: Array<Class<*>>): Boolean {
+        val int = Int::class.javaPrimitiveType
+        return when (p.size) {
+            2 -> (p[0] == Context::class.java && p[1] == int) ||
+                (p[0] == int && p[1] == View::class.java) ||
+                (p[0] == View::class.java && p[1] == int)
+            3 -> p[0] == int && p[1] == Resources.Theme::class.java && p[2] == Resources::class.java
+            else -> false
         }
     }
 
